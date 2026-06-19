@@ -1,0 +1,397 @@
+package project.com;
+
+import javafx.application.Application;
+import javafx.geometry.Insets;
+import javafx.geometry.Pos;
+import javafx.scene.Scene;
+import javafx.scene.control.*;
+import javafx.scene.text.Font;
+import javafx.stage.Stage;
+import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
+import javafx.scene.layout.*;
+import javafx.scene.image.Image;
+
+public class AppWindow extends Application {
+    private Inventory inv = new Inventory();
+    private Stage primaryStage;
+    private Scene mainMenuScene;
+    private final double TAX_RATE = 0.15; 
+
+    @Override
+    public void start(Stage stage)
+    {
+
+        this.primaryStage = stage;
+        inv.loadFromFile();
+        createMainMenu();
+        primaryStage.setTitle("Inventory Management System");
+        primaryStage.setScene(mainMenuScene);
+        primaryStage.show();
+    }
+
+    	private void applyBackground(Pane layout) {
+            try {
+                Image img = new Image("file:C:/Users/eeesh/OneDrive/Desktop/3.png"); 
+                
+                BackgroundSize bSize = new BackgroundSize(100, 100, true, true, false, true);
+                
+                BackgroundImage bImg = new BackgroundImage(
+                    img,
+                    BackgroundRepeat.NO_REPEAT, 
+                    BackgroundRepeat.NO_REPEAT, 
+                    BackgroundPosition.CENTER, 
+                    bSize
+                );
+                
+                layout.setBackground(new Background(bImg));
+            } catch (Exception e) {
+                System.out.println("Could not load background: " + e.getMessage());
+            }
+        
+    }
+    private void createMainMenu() {
+    	    VBox menuLayout = new VBox(15);
+    	    menuLayout.setAlignment(Pos.TOP_CENTER);
+    	    menuLayout.setPadding(new Insets(30, 20, 20, 20));
+
+    	   
+    	    menuLayout.setPrefSize(900,700); 
+
+    	    Label title = new Label("📦 Inventory Management");
+    
+    	    title.setStyle("-fx-font-size: 22px; -fx-font-weight: bold; -fx-text-fill: white; -fx-background-color: rgba(0,0,0,0.5); -fx-padding: 10px;");
+
+    	    Button btnAdd = new Button("Add Product");
+    	    Button btnView = new Button("View Full Inventory");
+    	    Button btnSearch = new Button("Search Product");
+    	    Button btnUpdate = new Button("Update Product");
+    	    Button btnDelete = new Button("Delete Product");
+    	    
+    	    
+
+    	    
+    	    
+    	    String btnStyle = "-fx-min-width: 200px; -fx-font-size: 14px;";
+    	    btnAdd.setStyle(btnStyle); btnView.setStyle(btnStyle);
+    	    btnSearch.setStyle(btnStyle); btnUpdate.setStyle(btnStyle); btnDelete.setStyle(btnStyle);
+
+    	    btnAdd.setOnAction(e -> showAddProductScene());
+    	    btnView.setOnAction(e -> showViewInventoryScene());
+    	    btnSearch.setOnAction(e -> showSearchScene());
+    	    btnUpdate.setOnAction(e -> showUpdatescene());
+    	    btnDelete.setOnAction(e -> showDeleteScene());
+
+    	    menuLayout.getChildren().addAll(title, btnAdd, btnView, btnSearch, btnUpdate, btnDelete);
+    	    applyBackground(menuLayout);
+    	    mainMenuScene = new Scene(menuLayout, 900, 700);
+    	} 
+
+  
+    private void showViewInventoryScene() {
+        VBox layout = new VBox(10);
+        layout.setPadding(new Insets(15));
+        
+        TextArea displayArea = new TextArea();
+        displayArea.setEditable(false);
+        displayArea.setFont(Font.font("Monospaced", 12));
+
+        StringBuilder sb = new StringBuilder();
+        
+        sb.append(String.format("%-5s | %-12s | %-5s | %-10s | %-8s | %-8s | %-12s\n", 
+                                "ID", "Name", "Qty", "Price", "Tax", "Profit", "Expiry Status"));
+        sb.append("-------------------------------------------------------------------------------------\n");
+
+        LocalDate today = LocalDate.now();
+
+        for (Product p : inv.getProducts()) {
+            double tax = (p.getSellingPrice() * p.getQuantity()) * TAX_RATE;
+            double profit = (p.getSellingPrice() - p.getCostPrice()) * p.getQuantity();
+            
+            String expiryStatus = "N/A";
+            if (p.getExpiryDate() != null && !p.getExpiryDate().equals("N/A")) {
+                try {
+                    LocalDate expDate = LocalDate.parse(p.getExpiryDate());
+                    long daysLeft = ChronoUnit.DAYS.between(today, expDate);
+                    expiryStatus = (daysLeft < 0) ? "EXPIRED" : daysLeft + " days left";
+                } catch (Exception e) { 
+                    expiryStatus = "Date Error"; 
+                }
+            }
+           
+            sb.append(String.format("%-5d | %-12s | %-5d | %-10.2f | %-8.2f | %-8.2f | %-12s\n", 
+                      p.getId(), p.getName(), p.getQuantity(), p.getSellingPrice(), tax, profit, expiryStatus));
+        }
+
+        displayArea.setText(sb.toString());
+        
+        Button back = new Button("⬅ Back to Menu");
+        back.setOnAction(e -> primaryStage.setScene(mainMenuScene));
+        
+        layout.getChildren().addAll(new Label("Detailed Inventory Report (Tax: 15%):"), displayArea, back);
+        applyBackground(layout);
+        primaryStage.setScene(new Scene(layout, 900, 700));
+    }
+
+    
+    private void showSearchScene() {
+        VBox layout = new VBox(10);
+        layout.setPadding(new Insets(15));
+
+        TextField searchField = new TextField();
+        searchField.setPromptText("Enter product name to search...");
+        TextArea resultArea = new TextArea();
+        resultArea.setEditable(false);
+
+        Button searchBtn = new Button("Search");
+        searchBtn.setOnAction(e -> {
+            String query = searchField.getText().toLowerCase().trim();
+            
+          
+            if (query.isEmpty()) {
+                resultArea.setText("Please enter a name to search.");
+                return; 
+            }
+
+            StringBuilder results = new StringBuilder("--- Search Results ---\n");
+            boolean found = false;
+            
+            for (Product p : inv.getProducts()) {
+                
+                if (p.getName().toLowerCase().contains(query)) {
+                    results.append("ID: ").append(p.getId())
+                           .append(" | Name: ").append(p.getName())
+                           .append(" | Qty: ").append(p.getQuantity())
+                           .append(" | Price: Rs.").append(p.getSellingPrice()).append("\n");
+                    found = true;
+                }
+            }
+            resultArea.setText(found ? results.toString() : "No matching products found.");
+        });
+
+        Button back = new Button("⬅ Back to Menu");
+        back.setOnAction(e -> primaryStage.setScene(mainMenuScene));
+
+        layout.getChildren().addAll(new Label("Product Search:"), searchField, searchBtn, resultArea, back);
+        applyBackground(layout);
+        primaryStage.setScene(new Scene(layout, 900,700));
+    }
+
+   
+    private void showAddProductScene() {
+        GridPane grid = new GridPane();
+        grid.setPadding(new Insets(20));
+        grid.setVgap(10); grid.setHgap(10);
+
+        TextField idF = new TextField(); TextField nameF = new TextField();
+        TextField qtyF = new TextField(); TextField catF = new TextField();
+        TextField sPF = new TextField(); TextField cPF = new TextField();
+        CheckBox expireCheck = new CheckBox("Does your item expire?");
+        TextField expF = new TextField(); 
+        expF.setPromptText("YYYY-MM-DD");
+        expF.setDisable(true);
+
+        expireCheck.setOnAction(e -> {
+            expF.setDisable(!expireCheck.isSelected());
+            if (!expireCheck.isSelected()) expF.clear();
+        });
+
+        grid.add(new Label("Product ID:"), 0, 0); grid.add(idF, 1, 0);
+        grid.add(new Label("Category:"), 0, 1); grid.add(catF, 1, 1);
+        grid.add(new Label("Product Name:"), 0, 2); grid.add(nameF, 1, 2);
+        grid.add(new Label("Quantity:"), 0, 3); grid.add(qtyF, 1, 3);
+        grid.add(new Label("Selling Price:"), 0, 4); grid.add(sPF, 1, 4);
+        grid.add(new Label("Cost Price:"), 0, 5); grid.add(cPF, 1, 5);
+        grid.add(expireCheck, 1, 6);
+        grid.add(new Label("Expiry Date:"), 0, 7); grid.add(expF, 1, 7);
+
+        Button save = new Button("Add product to inventory");
+        save.setOnAction(e -> {
+            StringBuilder errorLog = new StringBuilder();
+            
+         
+            int inputId = -1;
+            try {
+                inputId = Integer.parseInt(idF.getText());
+                
+              
+                for (Product p : inv.getProducts()) {
+                    if (p.getId() == inputId) {
+                        errorLog.append("- Product ID already exists. Please use a unique ID.\n");
+                        break; 
+                    }
+                }
+            } catch (NumberFormatException ex) {
+                errorLog.append("- Product ID must be a number.\n");
+            }
+
+           
+            String cat = catF.getText().trim();
+            String name = nameF.getText().trim();
+            
+
+            if (errorLog.length() > 0) {
+                Alert alert = new Alert(Alert.AlertType.ERROR);
+                alert.setTitle("Validation Errors");
+                alert.setHeaderText("Please fix the following issues:");
+                alert.setContentText(errorLog.toString());
+                alert.show();
+            } else {
+                
+                String date = "N/A";
+				Product p = new Product(
+                    inputId, cat, name,
+                    Integer.parseInt(qtyF.getText()), Double.parseDouble(sPF.getText()),
+                    Double.parseDouble(cPF.getText()), date
+                );
+                inv.addProductToInventory(p);
+                inv.saveToFile();
+                
+                new Alert(Alert.AlertType.INFORMATION, "Product added successfully!").showAndWait();
+                primaryStage.setScene(mainMenuScene);
+            }
+        });
+        Button back = new Button("Cancel");
+        back.setOnAction(e -> primaryStage.setScene(mainMenuScene));
+        grid.add(save, 1, 8); grid.add(back, 0, 8);
+        applyBackground(grid);
+        primaryStage.setScene(new Scene(grid, 900,700));
+    }
+
+    
+   
+    	private void showDeleteScene() {
+    		VBox layout = new VBox(15); 
+            layout.setAlignment(Pos.CENTER);
+            layout.setPadding(new Insets(20));
+
+       
+            applyBackground(layout);
+
+            TextField idField = new TextField();
+            idField.setPromptText("Enter ID to delete");
+            Button delBtn = new Button("Delete Product");
+            Button backBtn = new Button("Back");
+            
+            delBtn.setOnAction(e -> {
+                try {
+                    int id = Integer.parseInt(idField.getText());
+                    if(inv.deleteProductByID(id)) {
+                        inv.saveToFile();
+                        primaryStage.setScene(mainMenuScene);
+                    } else {
+                        new Alert(Alert.AlertType.WARNING, "ID not found").show();
+                    }
+                } catch (NumberFormatException ex) {
+                    new Alert(Alert.AlertType.ERROR, "Enter a valid ID").show();
+                }
+            });
+
+            backBtn.setOnAction(e -> primaryStage.setScene(mainMenuScene));
+
+            layout.getChildren().addAll(new Label("Delete Product by ID"), idField, delBtn, backBtn);
+            primaryStage.setScene(new Scene(layout, 900, 700)); 
+        }
+   
+    	private void showUpdatescene() {
+    	    VBox layout = new VBox(15);
+    	    layout.setAlignment(Pos.TOP_CENTER);
+    	    layout.setPadding(new Insets(20));
+    	    applyBackground(layout);
+
+    	    HBox search = new HBox(10);
+    	    search.setAlignment(Pos.CENTER);
+    	    TextField searchIdField = new TextField();
+    	    searchIdField.setPromptText("Enter Id you want to update: ");
+    	    Button btnUpdate = new Button("Find Product");
+    	    search.getChildren().addAll(new Label("Product ID:"), searchIdField, btnUpdate);
+
+    	    GridPane grid = new GridPane();
+    	    grid.setAlignment(Pos.CENTER);
+    	    grid.setVgap(10); grid.setHgap(10);
+    	    grid.setDisable(true);
+
+    	    TextField nameF = new TextField(); TextField catF = new TextField();
+    	    TextField qtyF = new TextField(); TextField sPF = new TextField();
+    	    TextField cPF = new TextField();
+
+    	    grid.add(new Label("Category:"), 0, 0); grid.add(catF, 1, 0);
+    	    grid.add(new Label("Product Name:"), 0, 1); grid.add(nameF, 1, 1);
+    	    grid.add(new Label("Quantity:"), 0, 2); grid.add(qtyF, 1, 2);
+    	    grid.add(new Label("Selling Price:"), 0, 3); grid.add(sPF, 1, 3);
+    	    grid.add(new Label("Cost Price:"), 0, 4); grid.add(cPF, 1, 4);
+
+    	    btnUpdate.setOnAction(e -> {
+    	        try {
+    	            int id = Integer.parseInt(searchIdField.getText());
+    	            Product found = null; 
+    	            for (Product p : inv.getProducts()) {
+    	                if (p.getId() == id) {
+    	                    found = p;
+    	                    break;
+    	                }
+    	            }
+
+    	            if (found != null) {
+    	                catF.setText(found.getCategory());
+    	                nameF.setText(found.getName());
+    	                qtyF.setText(String.valueOf(found.getQuantity()));
+    	                sPF.setText(String.valueOf(found.getSellingPrice()));
+    	                cPF.setText(String.valueOf(found.getCostPrice()));
+    	                grid.setDisable(false); 
+    	            } else {
+    	                new Alert(Alert.AlertType.WARNING, "Product ID not found!").show();
+    	                grid.setDisable(true);
+    	            }
+    	        } catch (NumberFormatException ex) {
+    	            new Alert(Alert.AlertType.ERROR, "Please enter a valid numeric ID").show();
+    	        }
+    	    });
+
+    	    Button btnSave = new Button("Save Changes");
+    	    btnSave.setOnAction(e -> {
+    	        StringBuilder errors = new StringBuilder();
+    	        String name = nameF.getText().trim();
+    	        String cat = catF.getText().trim();
+
+    	        if (!cat.matches("[a-zA-Z\\s]+")) errors.append("- Category must be letters.\n");
+    	        if (!name.matches("[a-zA-Z\\s]+")) errors.append("- Name must be letters.\n");
+
+    	        try {
+    	            int qty = Integer.parseInt(qtyF.getText());
+    	            double sp = Double.parseDouble(sPF.getText());
+    	            double cp = Double.parseDouble(cPF.getText());
+
+    	            if (errors.length() == 0) {
+    	                int id = Integer.parseInt(searchIdField.getText());
+    	                for (Product p : inv.getProducts()) {
+    	                    if (p.getId() == id) {
+    	                        p.setCategory(cat);
+    	                        p.setName(name);
+    	                        p.setQuantity(qty);
+    	                        p.setSellingPrice(sp);
+    	                        p.setCostPrice(cp);
+    	                        break;
+    	                    }
+    	                }
+    	                inv.saveToFile();
+    	                new Alert(Alert.AlertType.INFORMATION, "Product updated successfully!").showAndWait();
+    	                primaryStage.setScene(mainMenuScene);
+    	            } else {
+    	                new Alert(Alert.AlertType.ERROR, errors.toString()).show();
+    	            }
+    	        } catch (NumberFormatException ex) {
+    	            new Alert(Alert.AlertType.ERROR, "Quantity and Prices must be numbers.").show();
+    	        }
+    	    });
+
+    	    Button btnBack = new Button("Back to Menu");
+    	    btnBack.setOnAction(e -> primaryStage.setScene(mainMenuScene));
+
+    	    layout.getChildren().addAll(new Label("--- Update Product Information ---"), search, grid, btnSave, btnBack);
+    	    primaryStage.setScene(new Scene(layout, 900, 700));
+    	}
+
+    public static void main(String[] args) { launch(args); }
+}
+    	                  
